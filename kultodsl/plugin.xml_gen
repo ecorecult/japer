@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="windows-1250"?>
+<?eclipse version="3.0"?>
+<plugin>
+	<extension point="org.eclipse.emf.ecore.generated_package">
+		<package 
+			uri = "http://www.kulto.org/KultoDsl"
+			class = "org.kulto.kultoDsl.KultoDslPackage"
+			genModel = "model/generated/KultoDsl.genmodel" />
+	</extension>
+</plugin>

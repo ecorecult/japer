@@ -1,0 +1,69 @@
+grammar org.kulto.KultoDsl with org.eclipse.xtext.common.Terminals
+
+generate kultoDsl "http://www.kulto.org/KultoDsl"
+
+KultoModel:
+	elements+=RootElement*;
+
+RootElement:
+	Type | DomainPackage | Domain | Application;
+
+QualifiedName:
+	ID ('.' ID)*;
+
+QualifiedNameWithWildcard:
+	QualifiedName '.' '*';
+
+Import:
+	'import' importedNamespace=QualifiedNameWithWildcard;
+
+Type:
+	Primitive | DomainType;
+
+DomainType:
+	Ennum | Entity;
+
+Primitive:
+	'primitive:' name=ID 'java:' javaType=STRING;
+
+Ennum:
+	'enum:' name=ID '{'
+	(popis=Popis)?
+	literals+=EnnumLiteral* '}';
+
+EnnumLiteral:
+	name=ID (popis=Popis)?;
+
+Entity:
+	'entity:' name=ID ('extends>' superType=[Entity|QualifiedName])? '{'
+	(popis=Popis)?
+	attributes+=Attribute*
+	'}';
+
+Attribute:
+	'atr:' name=ID type=[Type|QualifiedName] (many?='*')? (popis=Popis)?;
+
+DomainPackage:
+	'package:' name=QualifiedName '{'
+	imports+=Import*
+	types+=DomainType*
+	'}';
+
+Domain:
+	'domain:' name=ID '{'
+	(popis=Popis)?
+	(children+=DomainChild)*
+	'}';
+
+DomainChild:
+	DomainPackage | DomainType;
+
+Application:
+	'application:' name=ID '{'
+	domains+=[Domain] (',' domains+=[Domain])*
+	'}';
+
+Popis:
+	'popis:' text=STRING;
+	
+

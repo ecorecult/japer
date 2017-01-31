@@ -1,0 +1,2700 @@
+grammar org.Paternoster with org.eclipse.xtext.common.Terminals
+
+import "http://www.eclipse.org/xtext/common/JavaVMTypes" as jvmTypes
+import "http://www.eclipse.org/emf/2002/Ecore" as ecore
+generate paternoster "http://www.Paternoster.org"
+
+PaternosterModel:
+	elements+=RootElement*;
+
+RootElement:
+	Import | Documents | Domain | PackageDeclaration | Analysis | Diagrams | Security | UI | Data | Db | WebServices |
+	BusinessServices | AppServices | Setup | Work | Application | Commands;
+
+QualifiedName:
+	ID ('.' ID)*;
+
+QualifiedNameWithWildcard:
+	QualifiedName '.' '*';
+
+Application:
+	'application:' name=ID '{'
+	('root-package:' rootPackage=STRING)
+	('domains>' domains+=[Domain]+)?
+	('services>' services+=[IService]+)?
+	'}';
+
+Month:
+	'month:' name=ID id=MonthId;
+
+enum MonthId:
+	JAN='JAN#' | FEB='FEB#' | MAR='MAR#' | APR='APR#' | MAY='MAY#' | JUN='JUN#' | JUL='JUL#' | AUG='AUG#' | SEP='SEP#'
+	| OCT='OCT#' | NOV='NOV#' | DEC='DEC#';
+
+DayMonth:
+	day=INT month=[Month];
+
+Work:
+	{Work}
+	'WORK:' '{'
+	(markers+=WorkMarker | projects+=WorkProject)*
+	'}';
+
+WorkProject:
+	'project:' title=STRING ('year:' year=INT) ('{'
+	(overview=Overview)?
+	(children+=WorkProjectChild)*
+	weeks+=WorkWeek*
+	'}')?;
+
+WorkProjectChild:
+	WorkGoal | WorkTask | WorkHabit;
+
+WorkItem:
+	WorkTask | WorkLog | WorkMarkerRef | WorkNote | WorkDilemma | WorkHabitLog;
+
+WorkWeek:
+	'week:' number=INT '{'
+	items+=WorkItem*
+	days+=WorkDay*
+	(valuation=Valuation)?
+	'}';
+
+WorkNote:
+	{WorkNote}
+	'note:' '{' (content=MixModel)? '}';
+
+WorkDay:
+	'day:' day=DayMonth '{'
+	items+=WorkItem*
+	(valuation=Valuation)?
+	'}';
+
+WorkMarkerRef:
+	marker=[WorkMarker];
+
+enum TimeUnit:
+	MINUTE='m+' | HOUR='h+';
+
+WorkLog:
+	'log>' task=[WorkTask] (time=INT timeUnit=TimeUnit) ('note:' note=STRING)?;
+
+WorkTask:
+	'task:' (name=ID)? (main?='!')? content=STRING ('goal>' goal=[WorkGoal])? (future=WorkTaskFuture)?;
+
+WorkDilemma:
+	'dilemma:' title=STRING '{'
+	'problem:' problem=STRING
+	'solution:' solution=STRING
+	'}';
+
+WorkTaskFuture:
+	TaskDone | TaskBlocked;
+
+TaskBlocked:
+	{TaskBlocked}
+	'block+' (note=STRING)?;
+
+TaskDone:
+	{TaskDone}
+	('+' | 'done+' (note=STRING)?);
+
+Valuation:
+	'valuation:' percent=INT '%' '{' content=MixModel '}';
+
+WorkGoal:
+	'goal:' name=ID '{'
+	(description=Description)?
+	childTasks+=WorkTask*
+	tasks+=[WorkTask]*
+	(valuation=Valuation)?
+	'}';
+
+WorkHabit:
+	'habit:' name=ID '{'
+	(description=Description)?
+	'}';
+
+/* Na rozdiel od WorkLog-u neobsahuje časovú zložku */
+WorkHabitLog:
+	'h>' habit=[WorkHabit] ('note:' note=STRING)?;
+
+WorkMarker:
+	'marker:' name=ID ('desc:' description=STRING)?;
+
+Tag:
+	'tag:' name=ID title=STRING;
+
+Import:
+	'import' importedNamespace=QualifiedNameWithWildcard;
+
+Documents:
+	{Documents}
+	'DOC:' '{'
+	(imports+=Import)*
+	children+=IDocumentsChild*
+	'}';
+
+IDocumentsChild:
+	ResourceDir | CodeDir | Book | Chapter | Section | Document | Tutorial | ModelElement | ModelElementGroup | Tag |
+	Feature
+	| FeatureSet | Artefact | DocumentIndex | DocumentTemplate;
+
+DocumentTemplate:
+	'document-template:' name=ID '{'
+	(navBar=DocumentNavBar)?
+	(footer=DocumentFooter)?
+	'}';
+
+DocumentNavBar:
+	{DocumentNavBar}
+	'nav-bar:' '{'
+	links+=DocumentNavLink*
+	'}';
+
+DocumentNavLink:
+	'nav-link:' '[' title=STRING ':' url=STRING (blank?='blank#')? ']'
+	('{' childLinks+=DocumentNavLink* '}')?;
+
+DocumentFooter:
+	{DocumentFooter}
+	'footer:' '{'
+	(content=MixModel)?
+	'}';
+
+DocumentIndex:
+	'document-index:' name=ID '{'
+	'title:' title=STRING
+	('subtitle:' subtitle=STRING)?
+	'entries:' '{' entries+=IDocumentEntry* '}'
+	'}';
+
+IDocumentEntry:
+	TopicEntry | DocumentEntry;
+
+TopicEntry:
+	'topic-entry:' title=STRING
+	('{' subentries+=IDocumentEntry* '}')?;
+
+DocumentEntry:
+	'document-entry>' document=[IDocument]
+	('{' subentries+=IDocumentEntry* '}')?;
+
+IDocument:
+	Document | Tutorial;
+
+Video:
+	{Video}
+	'video:' (name=ID)? ('file:' filename=STRING)?;
+
+VideoRef:
+	'video>' ref=[Video|QualifiedName];
+
+ImageRef:
+	'img>' (ref=[Image|QualifiedName]) (width=Width)? (display=Display)?;
+
+Image:
+	{Image}
+	'img:' (name=ID)?
+	('title:' title=STRING)?
+	('file:' filename=STRING)?;
+
+ResourceDir:
+	'resdir:' name=ID '{'
+	(path=IFilePath)
+	(images+=Image | videos+=Video)*
+	'}';
+
+IFilePath:
+	AbsolutePath | ProjectPath | ModelPath;
+
+AbsolutePath:
+	'absolute-path:' value=STRING;
+
+ProjectPath:
+	'project-path:' value=STRING;
+
+ModelPath:
+	'model-path:' value=STRING;
+
+CodeDir:
+	'codedir:' name=ID '{'
+	(codeblocks+=CodeBlock*)
+	'}';
+
+	// deprecated
+ModelElementGroup:
+	'element-group' name=ID '{'
+	('desc' '{' description=BlockModel '}')?
+	('elements' (elements+=[ModelElement])+)?
+	(groups+=ModelElementGroup)*
+	'}';
+
+	// deprecated
+ModelElement:
+	'element' (abstract?='abstract')? name=ID (title=STRING)? ('extends' (superElements+=[ModelElement])+)? '{'
+	('desc' '{' description=BlockModel '}')?
+	(attributes+=ElementAttribute)*
+	(exampleSets+=ExampleSet)*
+	'}';
+
+	// deprecated
+ElementAttribute:
+	'attr' name=(ID | STRING) (required?='!')? '{'
+	('desc' '{' description=InlineModel '}')?
+	('values' '{' (possibleValues+=ElementAttributeValue)+ '}')?
+	'}';
+
+	// deprecated
+ElementAttributeValue:
+	'[' title=STRING ':' description=InlineModel ']';
+
+	// deprecated
+ExampleSet:
+	'example-set' ('title' title=STRING)? '{' (examples+=Example)+ '}';
+
+	// deprecated
+Example:
+	'example' '[' (content=STRING) ':' (explanation=InlineModel) ']';
+
+Book:
+	'book:' name=ID '{'
+	(info=BookInfo)
+	(design=BookDesign)
+	(acknowledgment=Acknowledgment)?
+	(foreword=Foreword)?
+	(introduction=Introduction)?
+	(opinions+=Opinion)*
+	(chapters+=IChapter)*
+	'}';
+
+BookInfo:
+	'info:' '{'
+	('title:' title=STRING)
+	('subtitle:' subtitle=STRING)
+	('filename:' filename=STRING)
+	(authors+=Author)*
+	'}';
+
+BookDesign:
+	'design:' '{'
+	(colorScheme=ColorScheme)
+	(frontCover=FrontCover)
+	(titlePage=TitlePage)
+	(backCover=BackCover)
+	'}';
+
+ColorScheme:
+	'colorscheme:' '{'
+	('light-color:' lightColor=STRING)
+	('medium-color:' mediumColor=STRING)
+	('dark-color:' darkColor=STRING)
+	'}';
+
+FrontCover:
+	'frontcover:' '{'
+	('titleblock:' '{' titleBlock=TextBlock '}')
+	('subtitleblock:' '{' subtitleBlock=TextBlock '}')
+	'}';
+
+TitlePage:
+	'titlepage:' '{'
+	('titleblock:' '{' titleBlock=TextBlock '}')
+	('subtitleblock:' '{' subtitleBlock=TextBlock '}')
+	'}';
+
+	// absol�tne pozicionovan� blok textu
+TextBlock:
+	(textRows+=TextRow)+;
+
+	// riadok textu
+TextRow:
+	'textrow:' '{'
+	(content=STRING)
+	('fontsize:' fontSize=INT)
+	('top:' top=INT)
+	'}';
+
+BackCover:
+	'backcover:' '{'
+	(content=BlockModel)
+	'}';
+
+Opinion:
+	'opinion:' '{'
+	('who:' who=STRING)
+	('whos-position:' whosPosition=STRING)
+	('text:' text=STRING)
+	'}';
+
+Dedication:
+	'dedication:' '{'
+	(content=STRING)
+	('signature:' signature=STRING)
+	'}';
+
+Acknowledgment:
+	'acknowledgment:' '{'
+	(content=BlockModel)
+	('signature:' signature=STRING)?
+	'}';
+
+Introduction:
+	'introduction:' '{'
+	(content=BlockModel)
+	'}';
+
+Foreword:
+	'foreword:' '{'
+	(content=BlockModel)
+	('who:' who=STRING)
+	('whos-position:' whosPosition=STRING)
+	'}';
+
+	// FrontCover, BackCover
+Author:
+	'author:' name=ID '{'
+	('forname:' forname=STRING)
+	('surname:' surname=STRING)
+	(dedication=Dedication)?
+	('about:' '{' about=InlineModel '}')?
+	('photo:' photo=STRING)?
+	'}';
+
+	/*
+ * Superinterface which allows assemble Book from Chapter or ChapterRef elements.
+ */
+IChapter:
+	Chapter | ChapterRef;
+
+	/*
+ * Chapter is root Section which goes everytime on a new page.
+ * ID of chapter is optional, only if you want assemble book from
+ * chapters from different files use ID. It brings possibility
+ * to reference chapter through ChapterRef.
+ */
+Chapter:
+	'chapter:' (name=ID)? title=STRING '{'
+	(content=BlockModel)?
+	'}';
+
+ChapterRef:
+	'chapter>' chapter=[Chapter];
+
+	// TODO: remove @deprecated
+Elements:
+	'elements' '{'
+	(elements+=[ModelElement])+
+	'}';
+
+Document:
+	'document:' name=ID '{'
+	('title:' title=STRING)
+	('subtitle:' subtitle=STRING)?
+	('authors:' authors+=[Author]+)?
+	(design=DocumentDesign)?
+	('template>' template=[DocumentTemplate])?
+	(summary=Summary)?
+	('tags>' tags+=[Tag]*)?
+	(displayTableOfContent?='table-of-content+')?
+	('content:' '{' (content=BlockModel)? '}')?
+	'}';
+
+	/*
+ * Section is logical part of text, which can be nested.
+ * ID of section is optional. If you want reuse text from section
+ * in different document set ID and use SectionRef element.
+ */
+Section:
+	'section:' (name=ID)? title=STRING '{'
+	('tags>' tags+=[Tag]*)?
+	(content=BlockModel)?
+	'}';
+
+SectionRef:
+	'section>' section=[Section|QualifiedName];
+
+	/*
+ * Marker interface which allows us to collect all Section, SectionRef elements at once.
+ */
+ISection:
+	Section | SectionRef;
+
+DocumentDesign:
+	'design:' '{'
+	(colorScheme=ColorScheme)
+	(frontCover=FrontCover)?
+	(titlePage=TitlePage)?
+	(backCover=BackCover)?
+	'}';
+
+	// context-object for shortcuts (for example JavaLink without explicit library definition)
+// @deprecated
+Context:
+	'context:' '{'
+	('library' library=[Library])
+	'}';
+
+	// sumariz�cia (univerz�lny element)
+Summary:
+	'summary:' '{'
+	(content=MixModel)
+	'}';
+
+	// z�ver (univerz�lny element)
+Conclusion:
+	'conclusion:' '{'
+	(content=MixModel)
+	'}';
+
+Tutorial:
+	'tutorial:' name=ID '{'
+	('title:' title=STRING)
+	(summary=Summary)?
+	(prerequisites=TutorialPrerequisites)?
+	(steps+=TutorialStep)*
+	(conclusion=Conclusion)?
+	'}';
+
+TutorialPrerequisites:
+	'prerequisites:' '{'
+	(precedentTutorials+=[Tutorial])+
+	'}';
+
+TutorialStep:
+	'step:' title=STRING '{'
+	(content=BlockModel)?
+	(alternatives+=TutorialStepAlternative)*
+	'}';
+
+TutorialStepAlternative:
+	'alternative:' '{'
+	('title:' title=STRING)
+	('content:' '{' content=BlockModel '}')?
+	'}';
+
+MixNode:
+	InlineNode | RealBlockNode;
+
+MixModel:
+	(nodes+=MixNode)+;
+
+InlineNode:
+	TextNode | LinkNode | LineBreak;
+
+InlineModel:
+	(nodes+=InlineNode)+;
+
+	/*
+ * Model that contains RealBlockNodes and also DslBlockNodes
+ */
+BlockModel:
+	(nodes+=BlockNode)+;
+
+BlockNode:
+	RealBlockNode | DslBlockNode;
+
+	/*
+ * Document block nodes. Each node represents part of real document.
+ */
+RealBlockNode:
+	Section | SectionRef | Header | SubHeader | Paragraph | IList | Table | CodeBlock
+	| CodeBlockRef | ImageRef | Video | VideoRef | Note | PageBreak | HorizontalRule | Diagram | DiagramRef;
+
+	/**
+ * Specialized type of block-node which will be dynamically resolved to sequence RealBlockNode-s
+ */
+DslBlockNode:
+	AcronymsTable | TermsTable | ActorsTable | RolesTable
+	| UseCaseBlock | DomainBlock | UIBlock | RequirementBlock
+	| UseCaseEntityTable | UseCaseActorTable;
+
+Header:
+	('h:' text=STRING);
+
+SubHeader:
+	('sh:' text=STRING);
+
+/* example of custom terminal */
+terminal CODEBLOCK_DATA:
+	'[['->']]';
+
+enum Language:
+	NONE='none#' | JAVA='java#' | JAVASCRIPT='javascript#' | SCALA='scala#' | CSS='css#' | SQL='sql#' | XML='xml#';
+
+CodeBlock:
+	'code:' (name=ID)? ('title:' title=STRING)? (language=Language)? code=CODEBLOCK_DATA;
+
+CodeBlockRef:
+	'code>' ref=[CodeBlock|QualifiedName];
+
+Note:
+	'note:' '{' (nodes+=InlineNode)+ '}';
+
+Paragraph:
+	'p:' '{' (nodes+=InlineNode)+ '}';
+
+IList:
+	DefinedList | OrderedList | UnorderedList;
+
+DefinedList:
+	'ls:' ('[' type=ListType ']')? '{'
+	('in:' '{' intro=InlineModel '}')?
+	(items+=ListItem)+
+	'}';
+
+OrderedList:
+	'ol:' '{'
+	('in:' '{' intro=InlineModel '}')?
+	(items+=ListItem)+
+	'}';
+
+UnorderedList:
+	'ul:' '{'
+	('in:' '{' intro=InlineModel '}')?
+	(items+=ListItem)+
+	'}';
+
+ListItem:
+	'li:' '{' (nodes+=ListItemNode)+ '}';
+
+ListItemNode:
+	InlineNode | IList | Table | CodeBlock | ImageRef;
+
+Table:
+	'tbl:' '{'
+	('title:' title=STRING)?
+	(columns+=TableColumn)*
+	(rows+=TableRow)+
+	'}';
+
+TableColumn:
+	{TableColumn}
+	'col:' '(' ('width:' width=INT) (align=Align)? ')';
+
+Margin:
+	'margin:' top=INT ',' right=INT ',' bottom=INT ',' left=INT;
+
+Align:
+	{Align}
+	'align:' (horizontal=HorizontalAlign)? (vertical=VerticalAlign)?;
+
+enum HorizontalAlign:
+	LEFT='LEFT#' | CENTER='CENTER#' | RIGHT='RIGHT#';
+
+enum VerticalAlign:
+	TOP='TOP#' | MIDDLE='MIDDLE#' | BOTTOM='BOTTOM#';
+
+TableRow:
+	'tr:' '{' (cells+=ITableCell)+ '}';
+
+ITableCell:
+	TableHeaderCell | TableDataCell;
+
+	// colspan = horizontal span, rowspan = vertical span
+TableHeaderCell:
+	'th:' ('(' ('-' colspan=INT)? ('|' rowspan=INT)? ')')? title=STRING;
+
+TableDataCell:
+	'td:' ('(' ('-' colspan=INT)? ('|' rowspan=INT)? (align=Align)? ')')? '{' content=InlineModel '}';
+
+LinkNode:
+	ModelElementLink | ExternalLink | DocumentLink | ArtefactLink | FileLink | FolderLink | LibraryLink | JavaLink
+	| EntityLink | AttributeLink | StateMachineLink | StateMachineStateLink | RoleLink | TermLink | AcronymLink |
+	UIComponentLink | UseCaseLink | UseCaseAlternativeLink | SectionLink | DbSchemaLink | DbTableLink | DbColumnLink;
+
+SectionLink:
+	('sl>' | 'section-link>') section=[Section];
+
+DbSchemaLink:
+	'db-schema>' dbSchema=[DbSchema];
+
+DbTableLink:
+	'db-table>' dbTable=[DbTable];
+
+DbColumnLink:
+	'db-column>' dbColumn=[DbColumn];
+
+ModelElementLink:
+	'el>' (element=[ModelElement]);
+
+DocumentLink:
+	'doc>' (document=[Document]);
+
+ArtefactLink:
+	'artef>' (artefact=[Artefact]);
+
+FileLink:
+	'file>' (file=[File]);
+
+FolderLink:
+	'fold>' (folder=[Folder]);
+
+LibraryLink:
+	'lib>' (library=[Library]);
+
+JavaLink:
+	'java>' javaType=[jvmTypes::JvmType|QualifiedName] ('lib' library=[Library])?;
+
+ExternalLink:
+	('lnk:' | 'link:') '[' title=STRING ':' url=STRING (':' tooltip=STRING)? (blank?='blank#')? ']';
+
+EntityLink:
+	'ent>' entity=[Entity|QualifiedName];
+
+AttributeLink:
+	'att>' attribute=[Attribute|QualifiedName];
+
+UseCaseLink:
+	'uc>' useCase=[UseCase];
+
+UseCaseAlternativeLink:
+	'uc-alt>' alternative=[AlternativeFlow|QualifiedName];
+
+StateMachineLink:
+	'sm>' stateMachine=[StateMachine|QualifiedName];
+
+StateMachineStateLink:
+	'sm-st>' state=[ISMState|QualifiedName];
+
+RoleLink:
+	'ro>' role=[Role];
+
+TermLink:
+	'term>' term=[Term];
+
+AcronymLink:
+	'acro>' acronym=[Acronym];
+
+UIComponentLink:
+	'ui>' component=[UIComponent|QualifiedName];
+
+LineBreak:
+	'line-break' {LineBreak};
+
+PageBreak:
+	'page-break' {PageBreak};
+
+HorizontalRule:
+	'horizontal-rule' {HorizontalRule};
+
+	// abstract superclass (contains common attribute String text)
+TextNode:
+	N | B | I | U | C | BI | BU | IU | BIU;
+
+	// Normal
+N:
+	text=STRING;
+
+	// Bold
+B:
+	('b:' text=STRING);
+
+	// Italic
+I:
+	('i:' text=STRING);
+
+	// Underline
+U:
+	('u:' text=STRING);
+
+	// Code
+C:
+	('c:' text=STRING);
+
+	// Bold-Italic
+BI:
+	('bi:' text=STRING);
+
+	// Bold-Underline
+BU:
+	('bu:' text=STRING);
+
+	// Italic-Underline
+IU:
+	('iu:' text=STRING);
+
+	// Bold-Italic-Underline
+BIU:
+	('biu:' text=STRING);
+
+enum ListType:
+	DECIMAL='decimal#' | ALPHA_UPPER='alpha-upper#' | ALPHA_LOWER='alpha-lower#'
+	| ROMAN_UPPER='roman-upper#' | ROMAN_LOWER='roman-lower#' | NONE='none#'
+	| CIRCLE='circle#' | DISC='disc#' | SQUARE='square#';
+
+enum FormatKind:
+	BOLD='b' | ITALIC='i' | UNDERLINE='u' | CODE='c';
+
+enum SizeUnit:
+	PERCENT='%' | PIXEL='px';
+
+Width:
+	'width:' (size=INT) (unit=SizeUnit);
+
+enum DisplayType:
+	INLINE='inline' | BLOCK='block';
+
+Display:
+	'display' ':' (type=DisplayType);
+
+/* ::::: Features & Artefacts */
+Feature:
+	'feature:' name=ID title=STRING
+	('{' (overview=Overview)? (description=Description)? (childFeatures+=Feature*) '}')?;
+
+FeatureSet:
+	'feature-set:' name=ID title=STRING '{'
+	(overview=Overview)?
+	(description=Description)?
+	(features+=[Feature]*) '}';
+
+Overview:
+	{Overview}
+	'overview:' '{' (content=MixModel)? '}';
+
+Description:
+	'desc:' '{' content=MixModel '}';
+
+ShortDescription:
+	'short-desc:' content=InlineModel;
+
+FullDescription:
+	'full-desc:' '{' content=MixModel '}';
+
+Artefact:
+	FolderTree | Folder | File | FilePart | Library | LibrarySet;
+
+FolderTree:
+	'folder-tree:' name=ID '{'
+	(overview=Overview)?
+	(description=Description)?
+	root=Folder '}';
+
+Folder:
+	'folder:' name=ID realName=STRING '{'
+	(overview=Overview)?
+	(description=Description)?
+	(subfolders+=Folder*) '}';
+
+File:
+	'file:' name=ID realName=STRING '{'
+	(overview=Overview)?
+	(description=Description)? '}';
+
+FilePart:
+	'file-part:' name=ID 'in' file=[File] '{'
+	(overview=Overview)?
+	(description=Description)? '}';
+
+Library:
+	'library:' name=ID '{'
+	('depends>' dependsOn+=[Library]*)?
+	('artefact-id' artefactId=STRING)
+	('group-id' groupId=STRING)
+	('version' version=STRING)
+	('javadoc' javadoc=STRING)
+	('short-description' '{' shortDescription=InlineModel '}')
+	('full-description' '{' fullDescription=BlockModel '}')?
+	'}';
+
+LibrarySet:
+	'library-set' name=ID title=STRING '{'
+	(overview=Overview)?
+	(description=Description)?
+	libraries+=[Library]*
+	'}';
+
+/* :::: Domain (start) :::::  */
+Domain:
+	{Domain}
+	'DOMAIN:' (name=ID) '{'
+	(packages+=DomainPackage | types+=DomainType)*
+	'}';
+
+DomainPackage:
+	'package:' name=QualifiedName '{'
+	(packages+=DomainPackage | types+=DomainType)*
+	'}';
+
+/* Nový typový systém (start) */
+PackageDeclaration:
+	'package:' name=QualifiedName '{'
+	imports+=Import*
+	types+=TypeDeclaration*
+	'}';
+
+Type2:
+	SimpleType | ArrayType | ParameterizedType;
+
+SimpleType:
+	type=[TypeDeclaration|QualifiedName];
+
+ArrayType:
+	type=[TypeDeclaration|QualifiedName] '[' ']';
+
+ParameterizedType:
+	type=[TypeDeclaration|QualifiedName] '<' paramTypes+=Type2 (',' paramTypes+=Type2)* '>';
+
+	// typy obsahujúce telo
+BodyTypeDeclaration:
+	EnumDeclaration | ClassDeclaration | InterfaceDeclaration;
+
+TypeDeclaration:
+	PrimitiveDeclaration | TypeParameterDeclaration | BodyTypeDeclaration;
+
+PrimitiveDeclaration:
+	'primitive:' name=ID ('java:' javaType=STRING) ('[' doc=MixModel ']')?;
+
+EnumDeclaration:
+	'enum:' name=ID ('java:' javaType=STRING)? '{'
+	('[' doc=MixModel ']')?
+	literals+=EnumLiteralDeclaration*
+	'}';
+
+EnumLiteralDeclaration:
+	name=ID ('[' doc=MixModel ']')?;
+
+InterfaceDeclaration:
+	'interface:' name=ID
+	('<' typeParameters+=TypeParameterDeclaration (',' typeParameters+=TypeParameterDeclaration)* '>')?
+	('java:' javaType=STRING)?
+	('ext>' extends+=Type2 (',' extends+=Type2)*)? '{'
+	('[' doc=MixModel ']')?
+	methods+=MethodDeclaration*
+	'}';
+
+ClassDeclaration:
+	'class:' name=ID
+	('<' typeParameters+=TypeParameterDeclaration (',' typeParameters+=TypeParameterDeclaration)* '>')?
+	('java:' javaType=STRING)?
+	('ext>' superType=Type2)?
+	('impl>' implements+=Type2 (',' implements+=Type2)*)? '{'
+	('[' doc=MixModel ']')?
+	attributes+=AttributeDeclaration*
+	methods+=MethodDeclaration*
+	innerTypes+=TypeDeclaration*
+	'}';
+
+TypeParameterDeclaration:
+	name=ID (javaType=STRING)? ('[' doc=MixModel ']')?;
+
+AttributeDeclaration:
+	'att' name=ID type=Type2 ('[' doc=MixModel ']')?;
+
+MethodDeclaration:
+	'meth' name=ID
+	('<' typeParameters+=TypeParameterDeclaration (',' typeParameters+=TypeParameterDeclaration)* '>')?
+	'(' (parameters+=ParameterDeclaration (',' parameters+=ParameterDeclaration)*)? ')'
+	(':' returnType=Type2)? ('[' doc=MixModel ']')?;
+
+ParameterDeclaration:
+	type=Type2 name=ID;
+
+/* Nový typový systém (end) */
+Type:
+	Primitive | DomainType;
+
+DomainType:
+	Entity | Ennum;
+
+Primitive:
+	'primitive:' name=ID type=PrimitiveType;
+
+enum PrimitiveType:
+	BOOL='bool#' | INT='int#' | REAL='real#' | STRING='string#'
+	| DATE='date#' | DATE_TIME='date-time#' | TIME='time#' | BYTE_ARRAY='byte-array#';
+
+Ennum:
+	'enum:' name=ID '{'
+	(description=Description)?
+	(literals+=EnnumLiteral)*
+	'}';
+
+EnnumLiteral:
+	name=ID (title=STRING)? ('{' (description=Description)? '}')?;
+
+StateAttribute:
+	'state-attr:' name=ID statemachine=[StateMachine] (title=STRING)?;
+
+StateMachine:
+	'statemachine:' name=ID '{'
+	(description=Description)?
+	(states+=ISMState)*
+	'}';
+
+ISMState:
+	InitialState | SimpleState | CompositeState | FinalState;
+
+InitialState:
+	'initial:' name=ID '{'
+	transition=StateMachineTransition
+	'}';
+
+FinalState:
+	'final:' name=ID;
+
+SimpleState:
+	'simple:' name=ID
+	('{'
+	(description=Description)?
+	(transitions+=StateMachineTransition)*
+	'}')?;
+
+CompositeState:
+	'composite:' name=ID '{'
+	subStates+=ISMState*
+	transitions+=StateMachineTransition*
+	'}';
+
+StateMachineTransition:
+	'=>' target=[ISMState];
+
+/* AttributePath model (start) */
+
+/* Marker interface for attributes used in AttributePath objects. */
+Attribute:
+	EntityAttribute;
+
+/* object referencing one Attribute */
+AttributeRef:
+	attribute=[Attribute];
+
+/* path used to reference attributes */
+AttributePath:
+	attributes+=AttributeRef ('.' attributes+=AttributeRef)*;
+
+TypeScope:
+	UIDataContainer | Quantifier | UITreeModel | FindModel | FindChoices | EntityUnit | AddChildMethod |
+	RemoveChildMethod;
+
+/* AttributePath model (end) */
+Entity:
+	'entity:' name=ID (abbstract?='abs+')? ('ext>' superType=[Entity|QualifiedName])? '{'
+	(description=Description)?
+	(attributes+=EntityAttribute)*
+	('constraint:' '{' constraints+=EntityConstraint* '}')?
+	(methods+=EntityMethod)*
+	(statemachines+=StateMachine)*
+	'}';
+
+/* marker interface for all attributes that can be present in Entity */
+EntityAttribute:
+	SimpleAttribute | StateAttribute | RoleAttribute;
+
+/* superinterface for every constraint object */
+Constraint:
+	AttributeConstraint | EntityConstraint;
+
+AttributeConstraint:
+	NotNullConstraint | NotEmptyConstraint | SizeConstraint
+	| PatternConstraint | CreditCardConstraint | EmailConstraint
+	| PastConstraint | FutureConstraint | LengthConstraint | NumberConstraint;
+
+NotNullConstraint:
+	{NotNullConstraint}
+	'not-null:';
+
+NotEmptyConstraint:
+	{NotEmptyConstraint}
+	'not-empty:';
+
+PatternConstraint:
+	'pattern:' pattern=STRING;
+
+CreditCardConstraint:
+	{CreditCardConstraint}
+	'credit-card:';
+
+EmailConstraint:
+	{EmailConstraint}
+	'email:';
+
+PastConstraint:
+	{PastConstraint}
+	'past:';
+
+FutureConstraint:
+	{FutureConstraint}
+	'future:';
+
+NumberConstraintValue:
+	ExactValue | GreaterValue | GreaterEqualValue | LessValue | LessEqualValue | RangeValue;
+
+ExactValue:
+	value=INT;
+
+GreaterValue:
+	'>' value=INT;
+
+GreaterEqualValue:
+	'>=' value=INT;
+
+LessValue:
+	'<' value=INT;
+
+LessEqualValue:
+	'<=' value=INT;
+
+RangeValue:
+	from=INT '-' to=INT;
+
+LengthConstraint:
+	{LengthConstraint}
+	'length:' value=NumberConstraintValue;
+
+NumberConstraint:
+	{NumberConstraint}
+	'number:' value=NumberConstraintValue;
+
+SizeConstraint:
+	{SizeConstraint}
+	'size:' value=NumberConstraintValue;
+
+EntityConstraint:
+	UniqueConstraint;
+
+UniqueConstraint:
+	{UniqueConstraint}
+	'unique-constraint:' 'attrs>' attributes+=[EntityAttribute]* ('message:' message=STRING)?;
+
+/* classic, persisted attribute */
+SimpleAttribute:
+	'attr:' name=ID type=[Type|QualifiedName] (many?='*')?
+	(containment?='cont+')?
+	('opp>' opposite=[SimpleAttribute])?
+	(mandatory?='!')?
+	(title=STRING)?
+	('{'
+	(description=Description)?
+	('constraint:' '{' constraints+=AttributeConstraint* '}')?
+	'}')?;
+
+RoleAttribute:
+	'role-attr:' name=ID (many?='*')? (mandatory?='!')?;
+
+EntityMethod:
+	'method:' name=ID '(' (params+=Parameter (',' params+=Parameter)*)? ')' (':' type=TypeRef)?;
+
+Parameter:
+	name=ID type=TypeRef;
+
+TypeRef:
+	type=[Type|QualifiedName] (many?='*')?;
+
+/* :::: Domain (end) :::::  */
+
+/* ::::: Analysis model (start) */
+Analysis:
+	{Analysis}
+	'ANALYSIS:' '{'
+	(imports+=Import)*
+	(acronyms+=Acronym |
+	terms+=Term |
+	tags+=Tag |
+	actors+=Actor |
+	useCases+=UseCase |
+	requirements+=Requirement |
+	authors+=Author)*
+	'}';
+
+Actor:
+	'actor:' name=ID ('extend>' superActor=[Actor])? ('{'
+	('title:' title=STRING)?
+	(shortDescription=ShortDescription)?
+	(fullDescription=FullDescription)?
+	'}')?;
+
+TOContents:
+	{TOContents}
+	'toc:';
+
+AcronymsTable:
+	{AcronymsTable}
+	'acronyms-table:' ('{' ('includes>' includes+=[Acronym]* | 'excludes>' excludes+=[Acronym]*)? '}')?;
+
+TermsTable:
+	{TermsTable}
+	'terms-table:' ('{' ('includes>' includes+=[Term]* | 'excludes>' excludes+=[Term]*)? '}')?;
+
+RolesTable:
+	{RolesTable}
+	'roles-table:' ('{' ('includes>' includes+=[Role]* | 'excludes>' excludes+=[Role]*)? '}')?;
+
+ActorsTable:
+	{ActorsTable}
+	'actors-table:' ('{' ('includes>' includes+=[Actor]* | 'excludes>' excludes+=[Actor]*)? '}')?;
+
+UseCaseEntityTable:
+	{UseCaseEntityTable}
+	'usecase-entity-table:' '{' 'usecases>' usecases+=[UseCase]* 'entities>' entities+=[Entity]* '}';
+
+UseCaseActorTable:
+	{UseCaseActorTable}
+	'usecase-actor-table:' '{' 'usecases>' usecases+=[UseCase]* 'actors>' actors+=[Actor]* '}';
+
+UseCaseBlock:
+	{UseCaseBlock}
+	'usecase-block:' ('{' ('includes>' includes+=[UseCase]* | 'excludes>' excludes+=[UseCase]*)? '}')?;
+
+RequirementBlock:
+	{RequirementBlock}
+	'requirement-block:' ('{' ('includes>' includes+=[Requirement]*)? '}');
+
+DomainBlock:
+	{DomainBlock}
+	'domain-block:' ('{' ('includes>' includes+=[DomainType]* | 'excludes>' excludes+=[DomainType]*)? '}')?;
+
+UIBlock:
+	{UIBlock}
+	'ui-block:' ('{' ('includes>' includes+=[UITopContainer]* | 'excludes>' excludes+=[UITopContainer]*)? '}')?;
+
+Diagrams:
+	{Diagrams}
+	'DIAGRAM:' '{'
+	(imports+=Import)*
+	(diagrams+=Diagram)*
+	'}';
+
+NoteFor:
+	'note-for>' targets+=EObjectRef (bounds=Bounds)? ('{' (nodes+=InlineNode)+ '}')?;
+
+EObjectRef:
+	eObject=[ecore::EObject];
+
+DiagramRef:
+	'diagram>' diagram=[Diagram];
+
+Diagram:
+	ClassDiagram | UIDiagram | StateMachineDiagram | ObjectDiagram | UseCaseDiagram | RequirementDiagram | DbDiagram;
+
+RequirementDiagram:
+	{RequirementDiagram}
+	'requirement-diagram:' (name=ID)? '{'
+	nodes+=RequirementNode*
+	notes+=NoteFor*
+	'}';
+
+RequirementNode:
+	'requirement>' requirement=[Requirement] (bounds=Bounds)?;
+
+UseCaseDiagram:
+	{UseCaseDiagram}
+	'usecase-diagram:' (name=ID)? '{'
+	nodes+=UseCaseDiagramNode*
+	notes+=NoteFor*
+	'}';
+
+UseCaseDiagramNode:
+	ActorNode | UseCaseNode;
+
+ActorNode:
+	'actor>' actor=[Actor] (bounds=Bounds)?;
+
+UseCaseNode:
+	'usecase>' useCase=[UseCase] (bounds=Bounds)?;
+
+ObjectDiagram:
+	{ObjectDiagram}
+	'object-diagram:' (name=ID)? '{'
+	nodes+=InstanceNode*
+	notes+=NoteFor*
+	'}';
+
+InstanceNode:
+	'instance>' instance=[EntityInstance] (bounds=Bounds)?;
+
+StateMachineDiagram:
+	{StateMachineDiagram}
+	'statemachine-diagram:' (name=ID)? '{'
+	'statemachine>' stateMachine=[StateMachine|QualifiedName]
+	nodes+=ISMStateNode*
+	notes+=NoteFor*
+	'}';
+
+ISMStateNode:
+	state=[ISMState] (bounds=Bounds)?
+	('{' childNodes+=ISMStateNode* '}')?;
+
+UIDiagram:
+	{UIDiagram}
+	'ui-diagram:' (name=ID)? '{'
+	nodes+=UIDiagramNode*
+	'}';
+
+DbDiagram:
+	{DbDiagram}
+	'db-diagram:' (name=ID)? '{'
+	'schema>' schema=[DbSchema]
+	nodes+=DbTableNode*
+	'}';
+
+DbTableNode:
+	table=[DbTable] (bounds=Bounds)?;
+
+UIDiagramNode:
+	UIPageNode | UIWindowNode | UITemplateNode | UIComponentNode;
+
+UIPageNode:
+	'page>' page=[UIPage] (bounds=Bounds)?;
+
+UIWindowNode:
+	'window>' window=[UIWindow] (bounds=Bounds)?;
+
+UITemplateNode:
+	'template>' template=[UITemplatePage] (bounds=Bounds)?;
+
+UIComponentNode:
+	'ui>' component=[UIComponent|QualifiedName] (bounds=Bounds)?
+	('{' notes+=NoteFor* '}')?;
+
+ClassDiagram:
+	{ClassDiagram}
+	'class-diagram:' (name=ID)? '{'
+	'domain>' domain=[Domain]
+	(featureHide=EntityFeatureHide)?
+	(associationDisplay=EntityAssociationDisplay)?
+	nodes+=ClassDiagramNode*
+	'}';
+
+ClassDiagramNode:
+	EntityNode | EnnumNode;
+
+Bounds:
+	'(' x=INT ',' y=INT ')';
+
+IDiagramNode:
+	ClassDiagramNode | UIDiagramNode | UseCaseDiagramNode | RequirementNode | InstanceNode | DbTableNode |
+	ISMStateNode | NoteFor;
+
+DisplayEntityAttributes:
+	ShowEntityAttributes | HideEntityAttributes;
+
+ShowEntityAttributes:
+	'show>' attributes+=[EntityAttribute] (attributes+=[EntityAttribute])*;
+
+HideEntityAttributes:
+	'hide>' attributes+=[EntityAttribute] (attributes+=[EntityAttribute])*;
+
+/* Defined what to hide in entity */
+enum EntityFeatureHideType:
+	ALL='all#' | ATTRIBUTE='attr#' | ASSOCIATION='asso#';
+
+/* Defines how to display entity association */
+enum EntityAssociationDisplayType:
+	LIKE_ASSOCIATION='like-asso#' | LIKE_ATTRIBUTE='like-attr#' | LIKE_BOTH='like-both#';
+
+EntityFeatureHide:
+	'feature-hide:' type=EntityFeatureHideType;
+
+EntityAssociationDisplay:
+	'asso-display:' type=EntityAssociationDisplayType;
+
+EntityNode:
+	'entity>' entity=[Entity] (bounds=Bounds)? ('{'
+	(featureHide=EntityFeatureHide)?
+	(associationDisplay=EntityAssociationDisplay)?
+	(displayEntityAttributes=DisplayEntityAttributes)?
+	'}')?;
+
+EnnumNode:
+	'enum>' ennum=[Ennum] (bounds=Bounds)?;
+
+Acronym:
+	'acronym:' name=ID '{'
+	('title:' title=STRING)
+	(shortDescription=ShortDescription)?
+	(fullDescription=FullDescription)?
+	'}';
+
+Term:
+	'term:' name=ID '{'
+	('title:' title=STRING)
+	(shortDescription=ShortDescription)?
+	(fullDescription=FullDescription)?
+	'}';
+
+Requirement:
+	'requirement:' name=ID ('master>' master=[Requirement])? '{'
+	('id:' id=STRING)?
+	('title:' title=STRING)?
+	('type>' type=[RequirementType])?
+	('derived-from>' derivedFrom+=[Requirement]*)?
+	('satisfied-by>' satisfiedBy+=[UseCase]*)?
+	('text:' '{' text=MixModel '}' | 'copy>' copy=[Requirement])?
+	'}';
+
+RequirementType:
+	'requirement-type:' name=ID title=STRING;
+
+UseCase:
+	'usecase:' name=ID ('(' params+=UseCaseParam (',' params+=UseCaseParam)* ')')? (':' returnType=TypeRef)? '{'
+	('id:' id=STRING)?
+	('title:' title=STRING)
+	('extend>' extend=[UseCase] | 'inherit>' inherit=[UseCase])?
+	('authors>' authors+=[Author]+)?
+	('level>' level=[UseCaseLevel])?
+	('complexity>' complexity=[UseCaseComplexity])?
+	('status>' status=[UseCaseStatus])?
+	('goal:' goal=InlineModel)?
+	('actors>' actors+=[Actor]*)
+	('precond:' precondition=InlineModel)?
+	('postcond:' postcondition=InlineModel)?
+	(basicFlow=BasicFlow)
+	(alternativeFlows+=AlternativeFlow)*
+	(note=Note)?
+	'}';
+
+UseCaseParam:
+	typeRef=TypeRef name=ID (type=UseCaseParamType)?;
+
+enum UseCaseParamType:
+	MODIFY='modify+' | CONSULT='consult+' | CREATE='create+';
+
+IncludeUseCase:
+	'include-uc>' include=[UseCase];
+
+UseCaseInlineNode:
+	InlineNode | IncludeUseCase;
+
+UseCaseInlineModel:
+	(nodes+=UseCaseInlineNode)+;
+
+UseCaseLevel:
+	'usecase-level:' name=ID title=STRING;
+/* defaults: SUMMARY | USER | SUBFUNCTION */
+UseCaseComplexity:
+	'usecase-complexity:' name=ID title=STRING;
+/* defaults: LOW | MEDIUM | HIGH */
+UseCaseStatus:
+	'usecase-status:' name=ID title=STRING;
+/* defaults: NAME_ONLY | INITIAL | BASE | COMPLETE | DEFERRED */
+ImplementationStatus:
+	'implementation-status:' name=ID title=STRING;
+/* defaults: SCHEDULED | STARTED | PARTIALLY_COMPLETE | COMPLETE | PARTIALLY_DEFERRED */
+BasicFlow:
+	{BasicFlow}
+	'basic-flow:' '{'
+	(steps+=UseCaseStep*)
+	(note=Note)?
+	'}';
+
+AlternativeFlow:
+	'alternative-flow:' (name=ID)? '{'
+	('title:' title=STRING)
+	('fork-step>' forkStep=[UseCaseStep]) // diverge-from>
+	('join-step>' joinStep=[UseCaseStep])? // converge-to>
+	(steps+=UseCaseStep*)
+	(note=Note)?
+	'}';
+
+UseCaseStep:
+	'step:' (name=ID)? '{' actor=[Actor] '->' (content=UseCaseInlineModel) '}';
+
+/* ::::: Analysis model (end) */
+
+/* ::::: Security model (start) */
+Security:
+	{Security}
+	'SECURITY:' '{'
+	children+=ISecurityChild*
+	'}';
+
+ISecurityChild:
+	Role;
+
+Role:
+	'role:' name=ID ('{'
+	('title:' title=STRING)?
+	(shortDescription=ShortDescription)?
+	(fullDescription=FullDescription)?
+	'}')?;
+
+/* ::::: Security model (end) */
+
+/* ::::: UI model (start) ::::: */
+UI:
+	{UI}
+	'UI:' '{'
+	(imports+=Import)*
+	children+=UIChild*
+	'}';
+
+UIChild:
+	UITopContainer | UIPageFlow | UIPackage | FindModel | UITreeModel;
+
+UIPackage:
+	'client-package:' name=QualifiedName '{' (children+=UIChild)* '}';
+
+/* Marker interface for top level UI containers */
+UITopContainer:
+	UIPage | UIWindow | UITemplatePage;
+
+UIPage:
+	'page:' name=ID title=STRING ('template>' template=[UITemplatePage])? '{'
+	(description=Description)?
+	attributes+=UIAttribute*
+	(layout=IUILayout)?
+	containers+=UIContainer*
+	'}';
+
+UIWindow:
+	'window:' name=ID title=STRING '{'
+	(description=Description)?
+	attributes+=UIAttribute*
+	(layout=IUILayout)?
+	containers+=UIContainer*
+	'}';
+
+UITemplatePage:
+	'template-page:' name=ID '{'
+	(description=Description)?
+	'title:' title=STRING
+	(horizontalMenuBar=IUIHorizontalMenuBar)?
+	(navigline=UINavigline)?
+	(verticalMenuBar=IUIVerticalMenuBar)?
+	'}';
+
+UIComponent:
+	UITopContainer | UIContainer | UIFormComponent | UIActionComponent | UITab | IUIMenuBar;
+
+/* ::::: Containers ::::: */
+
+/*
+ * Top level components that are present direct under Page/Window.
+ */
+UIContainer:
+	UIDataContainer | UIDesignContainer;
+
+	/*
+ * Containers that are bind to some data. They creates type-scope for all child components.
+ */
+UIDataContainer:
+	UIView | UIForm | UIWizard | UITable | UITreeContainer;
+
+	/*
+ * Containers for design purpose only - to layout other containers, components. They do not
+ * create type-scope for child component.
+ */
+UIDesignContainer:
+	UIPanel | UITabbedPanel | UIFieldGroup;
+
+	/**
+ * Marker interface for containers displaying tree structure.
+ */
+UITreeContainer:
+	UITree | UITreeTable;
+
+UIPanel:
+	{UIPanel}
+	'panel:' (name=ID)? '{'
+	(description=Description)?
+	(layoutData=IUILayoutData)?
+	(layout=IUILayout)?
+	'}';
+
+UITabbedPanel:
+	{UITabbedPanel}
+	'tabbed-panel:' (name=ID)? '{'
+	(description=Description)?
+	(layoutData=IUILayoutData)?
+	tabs+=UITab*
+	'}';
+
+UITab:
+	'tab:' (name=ID)? title=STRING '{'
+	(description=Description)?
+	(layout=IUILayout)?
+	containers+=UIContainer*
+	'}';
+
+UIView:
+	'view:' (name=ID)? title=STRING ('type>' type=[Type|QualifiedName])? '{'
+	(description=Description)?
+	(model=UIDataModel)?
+	(layoutData=IUILayoutData)?
+	(layout=IUILayout)?
+	(header?='header+')?
+	fieldGroups+=UIFieldGroup*
+	'}';
+
+UIForm:
+	'form:' (name=ID)? title=STRING ('type>' type=[Type|QualifiedName])? '{'
+	(description=Description)?
+	(model=UIDataModel)?
+	(layoutData=IUILayoutData)?
+	(layout=IUILayout)?
+	(header?='header+')?
+	children+=UIFormChild*
+	(buttonGroup=UIButtonGroup)?
+	'}';
+
+UIFormChild:
+	UIFieldGroup | UITabbedPanel;
+
+UIWizard:
+	'wizard:' (name=ID)? title=STRING ('type>' type=[Type|QualifiedName])? '{'
+	(description=Description)?
+	(model=UIDataModel)?
+	(layoutData=IUILayoutData)?
+	steps+=UIWizardStep*
+	(buttonGroup=UIButtonGroup)?
+	'}';
+
+UIWizardStep:
+	'wizard-step:' (name=ID)? title=STRING '{'
+	(layout=IUILayout)?
+	fieldGroups+=UIFieldGroup*
+	'}';
+
+UITable:
+	'table:' (name=ID)? title=STRING ('type>' type=[Type|QualifiedName])? '{'
+	(description=Description)?
+	(model=UIDataModel)?
+	(layoutData=IUILayoutData)?
+	(header?='header+')?
+	(buttonGroup=UIButtonGroup)?
+	colGroup=UIColGroup
+	'}';
+
+UITree:
+	'tree:' (name=ID)? title=STRING ('type>' type=[Type|QualifiedName])? '{'
+	(description=Description)?
+	(model=IUITreeModel)?
+	(layoutData=IUILayoutData)?
+	(header?='header+')?
+	(buttonGroup=UIButtonGroup)?
+	treeColumn=UITreeColumn
+	'}';
+
+UITreeTable:
+	'tree-table:' (name=ID)? title=STRING ('type>' type=[Type|QualifiedName])? '{'
+	(description=Description)?
+	(model=IUITreeModel)?
+	(layoutData=IUILayoutData)?
+	(header?='header+')?
+	(buttonGroup=UIButtonGroup)?
+	treeColumn=UITreeColumn
+	colGroup=UIColGroup
+	'}';
+
+/* ::::: FormComponents ::::: */
+UIFieldGroup:
+	'field-group:' (name=ID)? title=STRING (toggleable?='toggle+')? '{'
+	(description=Description)?
+	(layoutData=IUILayoutData)?
+	formComponents+=UIFormComponent*
+	'}';
+
+UIFormComponent:
+	UILinkField | UIBindComponent;
+
+	/*
+ * Components that are bind to exact 1 Attribute.
+ */
+UIBindComponent:
+	UITextField | UIPasswordField | UIMaskField | UITextArea | UIRichTextArea | UISpinner
+	| UIDateField | UITimeField | UIDateTimeField
+	| UICheckBox | UIListView
+	| UIChoiceComponent | UIChooserComponent | UILabelComponent
+	| UIFileUpload | UIMultiFileUpload;
+
+	/*
+ * Special type of UIEditComponent that contains choices.
+ */
+UIChoiceComponent:
+	UIAutoCompleteField | UIDropDownChoice | UIRadioChoice | UICheckBoxChoice | UIListChoice | UIPaletteChoice;
+
+UIChooserComponent:
+	UILabelChooser | UIListViewChooser;
+
+UILabelComponent:
+	UILabelField | UIMultiLineLabelField;
+
+UILabelField:
+	{UILabelField}
+	'labelfield:' (name=ID)? (title=STRING)? (bind=UIBind)? (display=UIDisplay)? (tooltip=UITooltip)? ('{'
+	(description=Description)? '}')?;
+
+UIMultiLineLabelField:
+	{UIMultiLineLabelField}
+	'multiline-labelfield:' (name=ID)? (title=STRING)? (bind=UIBind)? (display=UIDisplay)?
+	('{' (description=Description)? '}')?;
+
+UIListView:
+	'listview:' (name=ID)? (title=STRING)? (bind=UIBind)? '{'
+	colGroup=UIColGroup
+	(description=Description)?
+	'}';
+
+IUIChooserTrigger:
+	UIAddLink | UIRemoveLink;
+
+UIAddLink:
+	{UIAddLink}
+	'add-link:' (title=STRING)?;
+
+UIRemoveLink:
+	{UIRemoveLink}
+	'remove-link:' (title=STRING)?;
+
+UILabelChooser:
+	'label-chooser:' (name=ID)? title=STRING (bind=UIBind)? (display=UIDisplay)? (tooltip=UITooltip)? '{'
+	triggers+=IUIChooserTrigger*
+	(description=Description)?
+	'}';
+
+UIListViewChooser:
+	'listview-chooser:' (name=ID)? title=STRING (bind=UIBind)? '{'
+	triggers+=IUIChooserTrigger*
+	colGroup=UIColGroup
+	(description=Description)?
+	'}';
+
+UILinkField:
+	'link:' (name=ID)? title=STRING (display=UIDisplay)? (tooltip=UITooltip)? ('{' (description=Description)? '}')?;
+
+UITextField:
+	{UITextField}
+	'textfield:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (onKey=OnKey)? (description=Description)? '}')?;
+
+UISpinner:
+	{UISpinner}
+	'spinner:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UIPasswordField:
+	{UIPasswordField}
+	'password:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+/* SuggestionField */
+UIAutoCompleteField:
+	'auto-complete:' (name=ID)? (title=STRING)? (bind=UIBind)? '{'
+	'choices:' choices=UIChoices
+	(description=Description)?
+	'}';
+
+UIMaskField:
+	{UIMaskField}
+	'maskfield:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UITextArea:
+	{UITextArea}
+	'textarea:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UIRichTextArea:
+	{UIRichTextArea}
+	'rich-textarea:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UIDateField:
+	{UIDateField}
+	'date:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UITimeField:
+	{UITimeField}
+	'time:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UIDateTimeField:
+	{UIDateTimeField}
+	'date-time:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UICheckBox:
+	{UICheckBox}
+	'checkbox:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UIDropDownChoice:
+	'dropdown-choice:' (name=ID)? (title=STRING)? (bind=UIBind)? '{'
+	'choices:' choices=UIChoices
+	(onChange=OnChange)?
+	(description=Description)?
+	'}';
+
+UIRadioChoice:
+	'radio-choice:' (name=ID)? (title=STRING)? (bind=UIBind)? '{'
+	'choices:' choices=UIChoices
+	(description=Description)?
+	'}';
+
+UICheckBoxChoice:
+	'checkbox-choice:' (name=ID)? (title=STRING)? (bind=UIBind)? '{'
+	'choices:' choices=UIChoices
+	(description=Description)?
+	'}';
+
+UIListChoice:
+	'list-choice:' (name=ID)? (title=STRING)? (bind=UIBind)? '{'
+	'choices:' choices=UIChoices
+	(description=Description)?
+	'}';
+
+UIPaletteChoice:
+	'palette-choice:' (name=ID)? (title=STRING)? (bind=UIBind)? '{'
+	'choices:' choices=UIChoices
+	(description=Description)?
+	'}';
+
+UIFileUpload:
+	{UIFileUpload}
+	'file-upload:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UIMultiFileUpload:
+	{UIMultiFileUpload}
+	'multifile-upload:' (name=ID)? (title=STRING)? (bind=UIBind)? ('{' (description=Description)? '}')?;
+
+UIChoices:
+	PrimitiveChoices | EnumChoices | EnumAllChoices | FindChoices | BindChoices;
+
+PrimitiveChoices:
+	'prim:' '('
+	options+=PrimitiveOption (',' options+=PrimitiveOption)*
+	')';
+
+EnumChoices:
+	'enum>'
+	options+=EnumOption (',' options+=EnumOption)*;
+
+EnumOption:
+	literal=[EnnumLiteral];
+
+EnumAllChoices:
+	{EnumAllChoices}
+	'enum-all';
+
+PrimitiveOption:
+	StringLiteral | IntLiteral;
+
+	/*
+ * UIDisplay is option because result of FindModel
+ * can be projection to primitive attribute
+ */
+FindChoices:
+	findModel=FindModel
+	(display=UIDisplay)?;
+
+BindChoices:
+	bindModel=BindModel
+	(display=UIDisplay)?;
+
+/* ::::: ActionComponents ::::: */
+UIActionComponent:
+	UIButton | UISubmitButton | UILink | UIMenuItem;
+
+UIButton:
+	'button:' (name=ID)? title=STRING (tooltip=UITooltip)?
+	('{' (onClick=OnClick)? '}')?;
+
+UISubmitButton:
+	'submit-button:' (name=ID)? title=STRING (tooltip=UITooltip)?
+	('{' (onClick=OnClick)? '}')?;
+
+UILink:
+	'link:' (name=ID)? title=STRING (tooltip=UITooltip)?
+	('{' (onClick=OnClick)? '}')?;
+
+/* interface with same attribute items+=UIMenuItem* */
+IUIMenuBar:
+	IUIHorizontalMenuBar | IUIVerticalMenuBar | UIMenuTab | UIMenuGroup;
+
+IUIHorizontalMenuBar:
+	UIHorizontalMenuBar | UITabbedHorizontalMenuBar;
+
+UITabbedHorizontalMenuBar:
+	{UITabbedHorizontalMenuBar}
+	'tabbed-horizontal-menubar:' (name=ID)? '{'
+	tabs+=UIMenuTab*
+	'}';
+
+UIMenuTab:
+	'menu-tab:' (name=ID)? title=STRING '{' items+=UIMenuItem* '}';
+
+UIHorizontalMenuBar:
+	{UIHorizontalMenuBar}
+	'horizontal-menubar:' (name=ID)?
+	'{' items+=UIMenuItem* '}';
+
+IUIVerticalMenuBar:
+	UIVerticalMenuBar | UIGrouppedVerticalMenuBar;
+
+UIGrouppedVerticalMenuBar:
+	{UIGrouppedVerticalMenuBar}
+	'groupped-vertical-menubar:' (name=ID)?
+	'{' groups+=UIMenuGroup* '}';
+
+UIMenuGroup:
+	'menu-group:' (name=ID)? title=STRING '{' items+=UIMenuItem* '}';
+
+UIVerticalMenuBar:
+	{UIVerticalMenuBar}
+	'vertical-menubar:' (name=ID)? '{' items+=UIMenuItem* '}';
+
+UINavigline:
+	{UINavigline} 'navigline:' '{' entries+=UINaviglineEntry* '}';
+
+UINaviglineEntry:
+	'navigline-entry:' (name=ID)? title=STRING;
+
+UIMenuItem:
+	'menuitem:' (name=ID)? title=STRING ('{' (onClick=OnClick)? subitems+=UIMenuItem* '}')?;
+
+UIButtonGroup:
+	{UIButtonGroup}
+	'buttons:' '{'
+	children+=UIButtonGroupChild*
+	'}';
+
+UIButtonGroupChild:
+	UIButton | UISubmitButton;
+
+/* ::::: Columns ::::: */
+
+/* container group for header and cell populators */
+UIColGroup:
+	{UIColGroup}
+	'columns:' '{'
+	children+=UIColGroupChild*
+	'}';
+
+/* interface for components that can be inside ColGroup of UITable or UIListView */
+UIColGroupChild:
+	UIHeaderGroup | UICellPopulator;
+
+UIHeaderGroup:
+	'header-group:' (name=ID)? title=STRING '{'
+	(header=UIColumnHeader)?
+	children+=UIColGroupChild*
+	'}';
+
+UIColumnHeader:
+	{UIColumnHeader}
+	'header:' '{'
+	(align=UIAlign)?
+	(sortBy=UISortBy)?
+	'}';
+
+UIColumnCell:
+	{UIColumnCell}
+	'cell:' '{'
+	(align=UIAlign)?
+	(tooltip=UITooltip)?
+	'}';
+
+UITooltip:
+	'tooltip:' value=STRING;
+
+UISortBy:
+	'sort-by>' attribute=AttributePath;
+
+UIAlign:
+	'align:' value=UIAlignValue;
+
+UIWidth:
+	'width:' value=INT;
+
+/* interface for columns containing in cell rendered text */
+UITextColumn:
+	UILabelColumn | UILinkColumn | UIGroupColumn;
+
+/* interface for components that can populate cells in iterable containers (UITable|UIListView) */
+UICellPopulator:
+	UITextColumn | UIIconColumn | UICheckBoxColumn;
+
+UILabelColumn:
+	'label-column:' (name=ID)? title=STRING (display=UIDisplay)? (sortable?='sortable#')? (width=UIWidth)? ('{'
+	(header=UIColumnHeader)?
+	(cell=UIColumnCell)?
+	(tooltip=UITooltip)?
+	(description=Description)?
+	'}')?;
+
+UILinkColumn:
+	'link-column:' (name=ID)? title=STRING (display=UIDisplay)? (sortable?='sortable#')? (width=UIWidth)? ('{'
+	(header=UIColumnHeader)?
+	(cell=UIColumnCell)?
+	(tooltip=UITooltip)?
+	(onClick=OnClick)?
+	(description=Description)?
+	'}')?;
+
+UIIconColumn:
+	'icon-column:' (name=ID)? (title=STRING)? icon=UIIcon (width=UIWidth)? ('{'
+	(header=UIColumnHeader)?
+	(cell=UIColumnCell)?
+	(tooltip=UITooltip)?
+	(onClick=OnClick)?
+	(description=Description)?
+	'}')?;
+
+UIGroupColumn:
+	'group-column:' (name=ID)? title=STRING ('group-by>' groupBy=AttributePath) (display=UIDisplay)? (width=UIWidth)?
+	('{'
+	(header=UIColumnHeader)?
+	(cell=UIColumnCell)?
+	(tooltip=UITooltip)?
+	(description=Description)?
+	'}')?;
+
+UICheckBoxColumn:
+	{UICheckBoxColumn}
+	'checkbox-column:' (name=ID)? (title=STRING)? (width=UIWidth)? ('{'
+	(tooltip=UITooltip)?
+	(onClick=OnClick)?
+	(description=Description)?
+	'}')?;
+
+enum UIIcon:
+	VIEW='VIEW#' | EDIT='EDIT#' | COPY='COPY#' | DELETE='DELETE#' | UP='UP#' | DOWN='DOWN#' | LOCK='LOCK#' | OK='OK#' |
+	ADD='ADD#';
+
+UIDisplay:
+	{UIDisplay}
+	'display>' displayAttributes+=AttributePath (',' displayAttributes+=AttributePath)*;
+
+	/*
+ * Simple projection binding to 1 attribute
+ */
+UIBind:
+	{UIBind}
+	'bind>' bindAttribute=AttributePath;
+
+UITreeColumn:
+	UILabelTreeColumn | UILinkTreeColumn;
+
+UILabelTreeColumn:
+	'label-treecolumn:' (name=ID)? title=STRING (display=UIDisplay)? (width=UIWidth)? ('{'
+	(header=UIColumnHeader)?
+	(cell=UIColumnCell)?
+	(tooltip=UITooltip)?
+	(description=Description)?
+	'}')?;
+
+UILinkTreeColumn:
+	'link-treecolumn:' (name=ID)? title=STRING (display=UIDisplay)? (width=UIWidth)? ('{'
+	(header=UIColumnHeader)?
+	(cell=UIColumnCell)?
+	(tooltip=UITooltip)?
+	(onClick=OnClick)?
+	(description=Description)?
+	'}')?;
+
+enum UIAlignValue:
+	LEFT='left' | CENTER='center' | RIGHT='right' | TOP='top' | MIDDLE='middle' | BOTTOM='bottom' |
+	LEFT_TOP='left-top' | LEFT_MIDDLE='left-middle' | LEFT_BOTTOM='left-bottom' |
+	CENTER_TOP='center-top' | CENTER_MIDDLE='center-middle' | CENTER_BOTTOM='center-bottom' |
+	RIGHT_TOP='right-top' | RIGHT_MIDDLE='right-middle' | RIGHT_BOTTOM='right-bottom';
+
+IUILayout:
+	UIGridLayout;
+
+IUILayoutData:
+	UIGridData;
+
+UIGridLayout:
+	'grid-layout:' '{' ('num-columns' numColumns=INT) '}';
+
+UIGridData:
+	{UIGridData}
+	'grid-data:' '{'
+	('col-span' colSpan=INT)?
+	('row-span' rowSpan=INT)?
+	('align' align=UIAlignValue)?
+	'}';
+
+	/**
+ * Interface that contains (wrapps) all models that can donor data to UI containers.
+ */
+UIDataModel:
+	FindModel | BindModel;
+
+	/**
+ * Model which reads entities from DB.
+ */
+FindModel:
+	'find>' (name=ID)? entity=[Entity|QualifiedName] (unique?='unique+')? ('{' (criteria=Criteria)? (sorting=Sorting)?
+	(projection=Projection)? '}')?;
+
+	/**
+ * Model that represents referenced data in UI (reference to UIAttribute etc.)
+ */
+BindModel:
+	'bind>' to=UIBindable;
+
+UIBindable:
+	ParentAttributeRef | PageAttributeRef | SessionAttributeRef;
+
+UIAttribute:
+	'attr:' name=ID type=[Type|QualifiedName] (many?='*')?;
+
+	/**
+ * Literal representing parent instance in TreeModel.
+ */
+ParentLiteral:
+	'parent.';
+
+	/**
+ * Reference to parent instance, used in TreeModel
+ */
+ParentAttributeRef:
+	'parent.' attPath=AttributePath;
+
+	/**
+ * Reference to UIAttribute in Session.
+ */
+SessionAttributeRef:
+	'session.' attribute=[UIAttribute] ('.' attPath=AttributePath)?;
+
+	/**
+ * Reference to UIAttribute in current Page.
+ */
+PageAttributeRef:
+	'page.' attribute=[UIAttribute] ('.' attPath=AttributePath)?;
+
+IUITreeModel:
+	UITreeModel | UITreeModelRef;
+
+UITreeModelRef:
+	'tree-model>' treeModel=[UITreeModel];
+
+UITreeModel:
+	'tree-model:' (name=ID)? (type=[Type] '.' recursiveAttribute=AttributePath)
+	'{' rootModel=UIDataModel '}';
+
+ExeBlock:
+	OnClick | OnKey | OnChange;
+
+OnClick:
+	{OnClick}
+	'on-click:' '{'
+	actions+=ExeBlockAction*
+	'}';
+
+OnKey:
+	{OnKey}
+	'on-key:' '{'
+	actions+=ExeBlockAction*
+	'}';
+
+OnChange:
+	{OnChange}
+	'on-change:' '{'
+	actions+=ExeBlockAction*
+	'}';
+
+ExeBlockAction:
+	NextPage | OpenWindow | CloseWindow;
+
+NextPage:
+	'next-page>' page=[UIPage];
+
+OpenWindow:
+	'open-window>' window=[UIWindow];
+
+CloseWindow:
+	{CloseWindow} 'close-window';
+
+UIPageFlow:
+	'page-flow:' '{'
+	'start-page>' startPage=[UIPage]
+	'}';
+
+Criteria:
+	{Criteria} 'criteria' '{' entries+=CriteriaEntry* '}';
+
+CriteriaEntry:
+	Criterion | CriteriaGroup | Quantifier;
+
+Criterion:
+	attribute=AttributePath operator=CriterionOperator (value=CriterionValue)?;
+
+CriteriaGroup:
+	type=CriteriaGroupType '{' entries+=CriteriaEntry* '}';
+
+enum CriteriaGroupType:
+	OR='||' | AND='&&';
+
+enum CriterionOperator:
+	EQ='==' | NE='!=' | GT='>' | LT='<' | GE='>=' | LE='<=' | LIKE='like' | ILIKE='ilike' | LIKE_START='like-start' |
+	LIKE_END='like-end' | LIKE_CONTAINS='like-contains' | IS_NULL='is-null' | NOT_NULL='not-null' |
+	IS_EMPTY='is-empty' | NOT_EMPTY='not-empty' | IN='in' | NOT_IN='not-in' |
+	CONTAINS='contains' | NOT_CONTAINS='not-contains' | RECURSIVE_INCLUDE='rec-in' |
+	RECURSIVE_EXCLUDE='rec-ex';
+
+CriterionValue:
+	PrimitiveInstance | InstanceRef | UIBindable | CollectionCriterionValue;
+
+CollectionCriterionValue:
+	{CollectionCriterionValue} '[' (values+=CriterionValue (',' values+=CriterionValue)*)? ']';
+
+Quantifier:
+	'quant' attribute=AttributePath type=QuantifierType '{' entries+=CriteriaEntry* '}';
+
+enum QuantifierType:
+	EXISTS='exists' | NOT_EXISTS='not-exists' | FOR_ALL='for-all';
+
+Sorting:
+	{Sorting} 'sorting' '{' sorts+=Sort* '}';
+
+Sort:
+	'sort' attribute=AttributePath type=SortType;
+
+Projection:
+	'projection' attribute=AttributePath;
+
+enum SortType:
+	ASC='-asc' | DESC='-desc';
+
+/* ::::: UI model end ::::: */
+
+/* ::::: Data model (start) */
+Data:
+	{Data} 'DATA:' '{'
+	imports+=Import*
+	children+=IDataChild*
+	'}';
+
+IDataChild:
+	EntityInstance;
+
+StringLiteral:
+	value=STRING;
+
+IntLiteral:
+	value=INT;
+
+PrimitiveInstance:
+	StringLiteral | IntLiteral | BooleanLiteral | FloatLiteral | DateLiteral | TimeLiteral | DateTimeLiteral;
+
+ReferencableInstance:
+	EntityInstance | EnnumLiteral | ISMState | Role;
+
+InstanceRef:
+	instance=[ReferencableInstance];
+
+/* marker rozhranie */
+IEntityInstance:
+	EntityInstance | EmbeddedEntityInstance;
+
+EntityInstance:
+	'instance:' entity=[Entity|QualifiedName] name=ID '{' (attributes+=AttributeInstance (','
+	attributes+=AttributeInstance)*)? '}';
+
+EmbeddedEntityInstance:
+	{EmbeddedEntityInstance} '{' (attributes+=AttributeInstance (',' attributes+=AttributeInstance)*)? '}';
+
+AttributeInstance:
+	attribute=[EntityAttribute] ':' value=AttributeValue;
+
+AttributeValue:
+	PrimitiveInstance | InstanceRef | EmbeddedEntityInstance | CollectionInstance;
+
+CollectionInstance:
+	{CollectionInstance} '[' (values+=AttributeValue (',' values+=AttributeValue)*)? ']';
+
+/* ::::: Data model (end) ::::: */
+
+/********* Commands (start) *******/
+Commands:
+	{Commands}
+	'CMD:' '{'
+	commands+=Command*
+	'}';
+
+Command:
+	GenerateDocuments | CompoundCommand;
+
+GenerateDocuments:
+	{GenerateDocuments}
+	'generate-documents:' (name=ID)? '{'
+	(destination=GenerateDocumentsDestination)?
+	'entries:' '{' entries+=GenerateDocumentsEntry* '}'
+	'}';
+
+GenerateDocumentsDestination:
+	LocalDir | RemoteDir;
+
+LocalDir:
+	'local-dir:' path=STRING;
+
+RemoteDir:
+	'remote-dir:' '{'
+	'host:' host=STRING
+	'port:' port=INT
+	'user:' user=STRING
+	'password:' password=STRING
+	'path:' path=STRING
+	'}';
+
+GenerateDocumentsEntry:
+	documents+=[GeneratedDocument] (',' documents+=[GeneratedDocument])* '->' type=GeneratedDocumentType;
+
+CompoundCommand:
+	{CompoundCommand}
+	'compound-command:' (name=ID)? '{'
+	childCommands+=[Command]*
+	'}';
+
+GeneratedDocument:
+	IDocument | DocumentIndex;
+
+enum GeneratedDocumentType:
+	HTML='HTML:' | PDF='PDF:' | DOCX='DOCX:' | WIKI='WIKI:';
+
+/********* Commands (end) *******/
+
+/* Marker interface for all services */
+IService:
+	DbService | BusinessService | IWebService;
+
+/* ::::: BS model (start) ::::: */
+BusinessServices:
+	{BusinessServices}
+	'BS:' '{'
+	(imports+=Import)*
+	services+=BusinessService*
+	'}';
+
+BusinessService:
+	'business-service:' name=ID '{'
+	(domain=BusinessDomain)?
+	methods+=BusinessMethod*
+	'}';
+
+BusinessDomain:
+	{BusinessDomain}
+	'domain:' '{'
+	types+=BusinessType*
+	'}';
+
+BusinessType:
+	BusinessClass | BusinessEnum;
+
+BusinessClass:
+	'class:' name=ID (abbstract?='abstract+')? ('extends>' superType=[BusinessClass|QualifiedName])? '{'
+	attributes+=BusinessAttribute*
+	'}';
+
+BusinessAttribute:
+	'att:' name=ID type=[Type|QualifiedName];
+
+BusinessEnum:
+	'enum:' name=ID '{'
+	literals+=BusinessEnumLiteral*
+	'}';
+
+BusinessEnumLiteral:
+	name=ID;
+
+BusinessMethodParameter:
+	type=[Type|QualifiedName] name=ID;
+
+BusinessMethod:
+	'method:' name=ID
+	'(' (params+=BusinessMethodParameter (',' params+=BusinessMethodParameter)*)? ')'
+	':' type=[Type|QualifiedName];
+
+/* ::::: BS model (end) ::::: */
+
+/* ::::: AppService (start) :::: */
+AppServiceConvention:
+	'app-service-convention:' name=ID '{'
+	'create-method:' createMethodPrefix=STRING
+	'read-method:' readMethodPrefix=STRING
+	'update-method:' updateMethodPrefix=STRING
+	'delete-method:' deleteMethodPrefix=STRING
+	'add-child-method:' addChildMethodPrefix=STRING
+	'remove-child-method:' removeChildMethodPrefix=STRING
+	'list-method:' listMethodPrefix=STRING
+	'page-method:' pageMethodPrefix=STRING
+	'tree-method:' treeMethodPrefix=STRING
+	'}';
+
+AppServices:
+	{AppServices}
+	'AS:' '{'
+	services+=AppService*
+	'}';
+
+AppService:
+	'app-service:' name=ID 'domain>' domain=[Domain] ('convention>' convention=[AppServiceConvention])? '{'
+	units+=AppServiceUnit*
+	'}';
+
+AppServiceUnit:
+	EntityUnit;
+
+EntityUnit:
+	entity=[Entity] '{'
+	methods+=EntityServiceMethod*
+	'}';
+
+EntityServiceMethod:
+	CreateEntityMethod | UpdateEntityMethod | ReadEntityMethod | DeleteEntityMethod | SaveEntityMethod | ListEntityMethod
+	| PageEntityMethod | AddChildMethod | RemoveChildMethod;
+
+CreateEntityMethod:
+	{CreateEntityMethod}
+	'CREATE:' ('(' (attributes+=AttributePath (',' attributes+=AttributePath)*)? ')')? (methodName=STRING)?;
+
+ReadEntityMethod:
+	{CreateEntityMethod}
+	'READ:' ('(' (attributes+=AttributePath (',' attributes+=AttributePath)*)? ')')? (methodName=STRING)?;
+
+UpdateEntityMethod:
+	{CreateEntityMethod}
+	'UPDATE:' ('(' (attributes+=AttributePath (',' attributes+=AttributePath)*)? ')')? (methodName=STRING)?;
+
+DeleteEntityMethod:
+	{DeleteEntityMethod}
+	'DELETE:' (methodName=STRING)?;
+
+SaveEntityMethod:
+	{SaveEntityMethod}
+	'SAVE:' ('(' (attributes+=AttributePath (',' attributes+=AttributePath)*)? ')')? (methodName=STRING)?;
+
+ListEntityMethod:
+	{ListEntityMethod}
+	'LIST:' ('(' (attributes+=AttributePath (',' attributes+=AttributePath)*)? ')')? (methodName=STRING)?;
+
+PageEntityMethod:
+	{PageEntityMethod}
+	'PAGE:' ('(' (attributes+=AttributePath (',' attributes+=AttributePath)*)? ')')? (methodName=STRING)?;
+
+AddChildMethod:
+	{AddChildMethod}
+	'ADD-CHILD>' childAttribute=[Attribute] ('(' (attributes+=AttributePath (','
+	attributes+=AttributePath)*)? ')')? (methodName=STRING)?;
+
+RemoveChildMethod:
+	{RemoveChildMethod}
+	'REMOVE-CHILD>' childAttribute=[Attribute] ('(' (attributes+=AttributePath (','
+	attributes+=AttributePath)*)? ')')? (methodName=STRING)?;
+
+/* ::::: AppService (end) :::: */
+
+/* ::::: WS model (start) ::::: */
+WebServices:
+	{WebServices}
+	'WS:' '{'
+	services+=IWebService*
+	'}';
+
+IWebService:
+	ImportedWebService | ExportedWebService;
+
+ImportedWebService:
+	'imported-web-service:' name=ID '{'
+	'wsdl-location:' wsdlLocation=STRING
+	'wsdl-target-namespace:' wsdlTargetNamespace=STRING
+	'wsdl-service-name:' wsdlServiceName=STRING
+	'wsdl-port-type-name:' wsdlPortTypeName=STRING
+	domain=WebDomain
+	methods+=WebMethodDeclaration*
+	ports+=WebPort*
+	'default-port>' defaultPort=[WebPort]
+	(httpAuthentication=HttpAuthentication)?
+	'}';
+
+HttpAuthentication:
+	'http-authentication:' '{'
+	'username:' username=STRING
+	'password:' password=STRING
+	'}';
+
+ExportedWebService:
+	'exported-web-service:' name=ID '{'
+	domain=WebDomain
+	methods+=WebMethod*
+	'}';
+
+WebPort:
+	'web-port:' name=ID '->' wsdlName=STRING;
+
+WebDomain:
+	{WebDomain}
+	'domain:' '{'
+	packages+=WebPackage*
+	'}';
+
+WebPackage:
+	'package:' name=ID '{'
+	('wsdl-namespace:' wsdlNamespace=STRING)?
+	types+=WebType*
+	'}';
+
+WebPrimitive:
+	'web-primitive:' name=ID;
+
+WebType:
+	WebClass | WebEnum | WebPrimitive;
+
+WebTypeRef:
+	type=[WebType|QualifiedName] (many?='*')?;
+
+WebClass:
+	'class:' name=ID (abbstract?='abstract+')? ('extends>' superType=[WebClass|QualifiedName])? ('->'
+	wsdlName=STRING)?
+	'{'
+	attributes+=WebAttribute*
+	('wsdl-attr-order:' wsdlAttributesOrder+=[WebAttribute]*)?
+	'}';
+
+WebAttribute:
+	'att:' name=ID type=WebTypeRef ('->' wsdlName=STRING)?;
+
+WebEnum:
+	'enum:' name=ID ('->' wsdlName=STRING)? '{'
+	literals+=WebEnumLiteral*
+	'}';
+
+WebEnumLiteral:
+	name=ID ('->' wsdlName=STRING)?;
+
+WebMethodParameter:
+	type=WebTypeRef name=ID ('->' wsdlName=STRING)?;
+
+WebMethodDeclaration:
+	'method:' name=ID ('->' wsdlName=STRING)?
+	'(' (params+=WebMethodParameter (',' params+=WebMethodParameter)*)? ')' ':' returnType=WebTypeRef ('->'
+	returnWsdlName=STRING)?;
+
+WebMethod:
+	'method:' name=ID
+	'(' (params+=WebMethodParameter (',' params+=WebMethodParameter)*)? ')'
+	':' returnType=WebTypeRef ('->' returnWsdlName=STRING)?;
+
+/* ::::: WS model (end) ::::: */
+
+/* ::::: DB model (start) ::::: */
+Db:
+	{Db} 'DB:' '{' (servers+=DbServer | connections+=DbConnection | schemas+=DbSchema | mappings+=DomainMapping |
+	services+=DbService)* '}';
+
+DbService:
+	'db-service:' name=ID '{'
+	('server>' dbServer=[DbServer] | 'connection>' dbConnection=[DbConnection])
+	('schema>' dbSchema=[DbSchema])
+	('domain>' domain=[Domain])
+	('mapping:' '{' mappings+=DbMapping* '}')?
+	'}';
+
+DomainMapping:
+	'domain-mapping:' name=ID '(' domain=[Domain] '->' schema=[DbSchema] ')' '{'
+	mappings+=DbMapping*
+	'}';
+
+DbMapping:
+	EntityMapping | InheritanceMapping;
+
+	/*
+ * Interface for scoping of IAttributeMapping-s which searches for the first parent of IEntityMapping type.
+ */
+IEntityMapping:
+	EntityMapping | InheritanceMapping | ISubclassMapping;
+
+EntityMapping:
+	{EntityMapping}
+	'entity>' entity=[Entity] '->' dbTable=[DbTable] '{'
+	idMapping=IdMapping
+	attributeMappings+=IAttributeMapping*
+	'}';
+
+IdMapping:
+	'id>' idAttribute=[SimpleAttribute] '->' dbColumn=[DbColumn];
+
+IAttributeMapping:
+	AttributeMapping | AssociationMapping;
+
+AttributeMapping:
+	'att>' attribute=[SimpleAttribute] '->' dbColumn=[DbColumn];
+
+AssociationMapping:
+	'ass>' attribute=[SimpleAttribute] '->'
+	associationType=AssociationType
+	(fetchType=FetchType)? // default is LAZY
+	strategy=AssociationMappingStrategy;
+
+AssociationMappingStrategy:
+	JoinColumn | JoinTable | MappedByOpposite;
+
+JoinColumn:
+	'join-col>' dbColumn=[DbColumn];
+
+JoinTable:
+	'join-tbl>' dbTable=[DbTable] '(' column=[DbColumn] ',' inverseColumn=[DbColumn] ')';
+
+MappedByOpposite:
+	{MappedByOpposite}
+	'mapp-by-opp';
+
+enum AssociationType:
+	ONE_TO_ONE='one-one' | ONE_TO_MANY='one-many'
+	| MANY_TO_ONE='many-one' | MANY_TO_MANY='many-many';
+
+enum FetchType:
+	LAZY='lazy+' | EAGER='eager+';
+
+ISubclassMapping:
+	SubclassPerTableMapping | SubclassJoinTableMapping | SubclassSingleTableMapping;
+
+SubclassPerTableMapping:
+	'subclass>' subClass=[Entity] '->' dbTable=[DbTable] '{'
+	idMapping=IdMapping
+	attributeMappings+=IAttributeMapping*
+	'}';
+
+SubclassJoinTableMapping:
+	'subclass>' subClass=[Entity] '->' dbTable=[DbTable] '{'
+	'join-col>' joinColumn=[DbColumn]
+	attributeMappings+=IAttributeMapping*
+	'}';
+
+SubclassSingleTableMapping:
+	'subclass>' subClass=[Entity] '{'
+	'discrim:' discriminator=STRING
+	attributeMappings+=IAttributeMapping*
+	'}';
+
+InheritanceMapping:
+	'inherit>' superClass=[Entity] '{'
+	strategy=InheritanceMappingStrategy
+	'}';
+
+InheritanceMappingStrategy:
+	SingleTableStrategy | JoinTableStrategy | PerTableStrategy;
+
+SingleTableStrategy:
+	'single-tbl>' dbTable=[DbTable] '{'
+	'discrim-col>' discriminatorColumn=[DbColumn]
+	(idMapping=IdMapping)?
+	subclassMappings+=SubclassSingleTableMapping*
+	'}';
+
+JoinTableStrategy:
+	'join-tbl>' dbTable=[DbTable] '{'
+	(idMapping=IdMapping)?
+	attributeMappings+=IAttributeMapping*
+	subclassMappings+=SubclassJoinTableMapping*
+	'}';
+
+PerTableStrategy:
+	{PerTableStrategy}
+	'per-tbl:' '{'
+	subclassMappings+=SubclassPerTableMapping*
+	'}';
+
+DbConnection:
+	'db-connection:' name=ID '{'
+	server=[DbServer]
+	('user:' user=STRING)
+	('password:' password=STRING)
+	'}';
+
+DbServer:
+	'db-server:' name=ID '{'
+	('host:' host=STRING)
+	('port:' port=INT)
+	('db-name:' dbName=STRING)
+	('db-type:' dbType=DbType)
+	('user:' user=STRING)
+	('password:' password=STRING) '}';
+
+enum DbType:
+	HSQL_IN_MEMORY='HSQL_IN_MEMORY' | HSQL_STANDALONE='HSQL_STANDALONE'
+	| MYSQL='MYSQL' | POSTGRESQL='POSTGRESQL' | FIREBIRD='FIREBIRD'
+	| ORACLE='ORACLE';
+
+DbSchema:
+	'db-schema:' name=ID '{' tables+=DbTable* '}';
+
+DbTable:
+	'db-table:' name=ID '{' columns+=DbColumn* '}';
+
+DbColumn:
+	name=ID
+	(typeInstance=SqlTypeInstance)
+	(primaryKey?=('pk+' | 'primary-key+'))?
+	(nullable?=('null+' | 'nullable+'))?
+	(referencedColumn=DbColumnRef)?;
+
+DbColumnRef:
+	('fk>' | 'column-ref>') dbTable=[DbTable] '.' dbColumn=[DbColumn];
+
+Setup:
+	{Setup}
+	'SETUP:' '{'
+	(usecaseLevels+=UseCaseLevel |
+	usecaseComplexities+=UseCaseComplexity |
+	usecaseStatuses+=UseCaseStatus |
+	implStatuses+=ImplementationStatus |
+	requirementTypes+=RequirementType |
+	sqlTypes+=SqlTypeDeclaration |
+	primitives+=Primitive |
+	webPrimitives+=WebPrimitive |
+	appServiceContentions+=AppServiceConvention |
+	buildInTypes+=TypeDeclaration |
+	buildInPackages+=PackageDeclaration |
+	months+=Month |
+	workMarkers+=WorkMarker)*
+	'}';
+
+enum SqlAttribute:
+	PRECISION='precision#' | SCALE='scale#' | SIZE='size#';
+
+SqlTypeDeclaration:
+	'sql-type:' name=ID ('(' attributes+=SqlAttribute (',' attributes+=SqlAttribute)* ')')?;
+
+SqlTypeInstance:
+	typeDeclaration=[SqlTypeDeclaration] ('(' arguments+=INT (',' arguments+=INT)* ')')?;
+
+/* ::::: DB model (end) ::::: */
+
+/* ::::: special literals ::::: */
+BooleanLiteral:
+	value=('true' | 'false');
+
+FloatLiteral:
+	value=FLOAT;
+
+terminal FLOAT returns ecore::EFloatObject:
+	('-')? ('0'..'9')+ '.' ('0'..'9')+;
+
+DateLiteral:
+	value=DATE;
+
+	// datatype rule
+DATE returns ecore::EDate:
+	INT '/' INT '/' INT;
+
+TimeLiteral:
+	value=TIME;
+
+	// datatype rule
+TIME returns ecore::EDate:
+	INT ':' INT;
+
+DateTimeLiteral:
+	value=DATETIME;
+
+	// datatype rule
+DATETIME returns ecore::EDate:
+	DATE TIME;
+
+	/*
+DateLiteral:
+	value=DATE;
+
+terminal DATE returns ecore::EDate:
+	'0'..'3' '0'..'9' '.' '0'..'1' '0'..'9' '.' '0'..'9' '0'..'9' '0'..'9' '0'..'9';
+
+TimeLiteral:
+	value=TIME;
+
+terminal TIME returns ecore::EDate:
+	'0'..'1' '0'..'9' | '2' ('0' | '1' | '2' | '3') ':' '0'..'5' '0'..'9' ':' '0'..'5' '0'..'9';
+
+DateTimeLiteral:
+	value=DATETIME;
+
+terminal DATETIME returns ecore::EDate:
+	DATE '-' TIME;
+ */
+
+
